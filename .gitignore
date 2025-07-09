@@ -1,0 +1,28 @@
+# Ignorar entornos virtuales
+.venv/
+venv/
+
+# Ignorar archivos de entorno
+.env
+**/.env
+
+# Ignorar archivos de Python que no deben subirse
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignorar configuraciones de VSCode
+.vscode/
+
+# Ignorar archivos temporales o de sistema
+*.log
+*.DS_Store
+*.swp
+
+# Ignorar dependencias específicas del frontend (si usas npm o yarn)
+node_modules/
+
+# Ignorar dist y build si compilas algo
+dist/
+build/
