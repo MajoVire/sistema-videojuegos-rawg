@@ -334,21 +334,29 @@ def actualizar_juego(juego_id):
     nombre = data.get("nombre")
     fecha_lanzamiento = data.get("fecha_lanzamiento")
     rating = data.get("rating")
-    usuario_simulado = data.get("usuario_simulado")  # 👈
+    usuario_simulado = data.get("usuario_simulado")
 
     if not all([nombre, fecha_lanzamiento, rating is not None, usuario_simulado]):
         return jsonify({"error": "Faltan datos"}), 400
 
-    g.usuario_simulado = usuario_simulado  # 👈 Establecerlo antes de get_conn()
+    from flask import g
+    g.usuario_simulado = usuario_simulado
+    print("Usuario simulado:", g.usuario_simulado)
 
     try:
         conn = get_conn()
         conn.autocommit = False
+
         with conn.cursor() as cur:
+            # 👇 Esta línea es CLAVE para que PostgreSQL registre bien el usuario
+            cur.execute("SET application_name = %s;", (usuario_simulado,))
+
+            # 👇 Bloquear el registro con SELECT FOR UPDATE
             cur.execute("SELECT id FROM juegos WHERE id = %s FOR UPDATE;", (juego_id,))
             if not cur.fetchone():
                 return jsonify({"error": "Juego no encontrado"}), 404
 
+            # 👇 Hacer el UPDATE
             cur.execute("""
                 UPDATE juegos
                 SET nombre = %s,
@@ -357,14 +365,15 @@ def actualizar_juego(juego_id):
                 WHERE id = %s;
             """, (nombre, fecha_lanzamiento, rating, juego_id))
 
-            conn.commit()
-
+        conn.commit()
         return jsonify({"mensaje": "Juego actualizado con éxito"})
+
     except Exception as e:
+        print("Error al actualizar juego:", e)
         return jsonify({"error": str(e)}), 500
+
     finally:
         conn.close()
-
 
 
 @app.route("/api/juegos/todos", methods=["GET"])
