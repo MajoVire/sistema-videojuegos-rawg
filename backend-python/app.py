@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, g
 from flask_cors import CORS
 import requests
 import psycopg2
@@ -20,12 +20,15 @@ result = urlparse(db_url)
 
 # Función para obtener una conexión nueva por petición
 def get_conn():
+    usuario_simulado = getattr(g, "usuario_simulado", "anonimo")
+
     return psycopg2.connect(
         dbname=result.path[1:],
         user=result.username,
         password=result.password,
         host=result.hostname,
-        port=result.port
+        port=result.port,
+        options=f"-c application_name={usuario_simulado}"
     )
 
 # -------------------------------
@@ -39,6 +42,16 @@ app.locked_conns = {}
 # Rutas del API
 # -------------------------------
 
+@app.before_request
+def asignar_usuario_simulado():
+    from flask import g, request
+    if request.is_json:
+        data = request.get_json(silent=True)
+        g.usuario_simulado = data.get("usuario_simulado", "anonimo") if data else "anonimo"
+    else:
+        g.usuario_simulado = "anonimo"
+
+
 
 @app.route("/api/generos", methods=["GET"])
 def listar_generos():
@@ -48,7 +61,6 @@ def listar_generos():
             generos = cur.fetchall()
     return jsonify([{"id": g[0], "nombre": g[1]} for g in generos])
 
-
 @app.route("/api/plataformas", methods=["GET"])
 def listar_plataformas():
     with get_conn() as conn:
@@ -56,7 +68,6 @@ def listar_plataformas():
             cur.execute("SELECT id, nombre FROM plataformas ORDER BY nombre;")
             plataformas = cur.fetchall()
     return jsonify([{"id": p[0], "nombre": p[1]} for p in plataformas])
-
 
 @app.route("/api/desarrolladores", methods=["GET"])
 def listar_desarrolladores():
@@ -70,8 +81,6 @@ def listar_desarrolladores():
             resultados = cur.fetchall()
     return jsonify([{"id": r[0], "nombre": r[1]} for r in resultados])
 
-
-
 @app.route("/api/etiquetas", methods=["GET"])
 def listar_etiquetas():
     q = request.args.get("q", "").lower()
@@ -83,9 +92,6 @@ def listar_etiquetas():
             )
             resultados = cur.fetchall()
     return jsonify([{"id": r[0], "nombre": r[1]} for r in resultados])
-
-
-
 
 @app.route("/api/juegos", methods=["GET"])
 def listar_juegos():
@@ -122,7 +128,6 @@ def listar_juegos():
 
 
 @app.route("/api/juegos/filtrar", methods=["GET"])
-
 def filtrar_juegos():
     genero = request.args.get("genero")
     plataforma = request.args.get("plataforma")
@@ -165,9 +170,6 @@ def filtrar_juegos():
     except Exception as e:
         print("Error en filtrar_juegos:", e)
         return jsonify({"error": "No se pudieron cargar los juegos"}), 500
-
-
-
 
 @app.route("/api/usuarios", methods=["GET"])
 def obtener_usuarios_simulados():
@@ -271,6 +273,55 @@ def obtener_juego_por_id(juego_id):
             })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+@app.route("/api/juegos/insertar", methods=["POST"])
+def insertar_juego():
+    try:
+        data = request.get_json(force=True)
+
+        nombre = data.get("nombre")
+        fecha = data.get("fecha") or None
+        rating = data.get("rating") or None
+        usuario_simulado = data.get("usuario_simulado")
+
+        generos = data.get("generos", [])
+        plataformas = data.get("plataformas", [])
+        desarrolladores = data.get("desarrolladores", [])
+        etiquetas = data.get("etiquetas", [])
+
+        if not nombre or not usuario_simulado:
+            return jsonify({"error": "Faltan campos obligatorios"}), 400
+
+        from flask import g
+        g.usuario_simulado = usuario_simulado
+        print("Usuario simulado:", g.usuario_simulado)
+
+        # Aquí se abre la conexión
+        with get_conn() as conn, conn.cursor() as cur:
+            # ⚠️ Forzamos el valor en la sesión PostgreSQL
+            cur.execute("SET application_name = %s;", (usuario_simulado,))
+
+            # Insertar juego y relaciones
+            cur.execute("SELECT insertar_juego(%s, %s, %s);", (nombre, fecha, rating))
+            juego_id = cur.fetchone()[0]
+
+            for id_genero in generos:
+                cur.execute("SELECT insertar_juego_genero(%s, %s);", (juego_id, id_genero))
+            for id_plataforma in plataformas:
+                cur.execute("SELECT insertar_juego_plataforma(%s, %s);", (juego_id, id_plataforma))
+            for id_desarrollador in desarrolladores:
+                cur.execute("SELECT insertar_juego_desarrollador(%s, %s);", (juego_id, id_desarrollador))
+            for id_etiqueta in etiquetas:
+                cur.execute("SELECT insertar_juego_etiqueta(%s, %s);", (juego_id, id_etiqueta))
+
+            conn.commit()
+
+        return jsonify({"mensaje": "Juego insertado correctamente", "id": juego_id})
+
+    except Exception as e:
+        print("Error al insertar juego:", e)
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route("/api/juegos/<int:juego_id>", methods=["PUT"])
 def actualizar_juego(juego_id):
@@ -309,12 +360,6 @@ def obtener_todos_juegos():
         juegos = cur.fetchall()
 
     return jsonify([{"id": j[0], "nombre": j[1]} for j in juegos])
-
-# Puedes agregar más rutas como:
-# - /api/generos
-# - /api/juegos/<int:id>
-# - /api/juegos/agregar (POST)
-# - /api/juegos/eliminar/<id> (DELETE)
 
 # -------------------------------
 # Iniciar el servidor
