@@ -248,6 +248,68 @@ def usuarios_activos():
     ]
 
     return jsonify(activos)
+
+@app.route("/api/juegos/<int:juego_id>", methods=["GET"])
+def obtener_juego_por_id(juego_id):
+    try:
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, nombre, fecha_lanzamiento, rating
+                FROM juegos
+                WHERE id = %s;
+            """, (juego_id,))
+            juego = cur.fetchone()
+
+            if not juego:
+                return jsonify({"error": "Juego no encontrado"}), 404
+
+            return jsonify({
+                "id": juego[0],
+                "nombre": juego[1],
+                "fecha_lanzamiento": juego[2].isoformat() if juego[2] else None,
+                "rating": juego[3]
+            })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/juegos/<int:juego_id>", methods=["PUT"])
+def actualizar_juego(juego_id):
+    data = request.get_json(force=True)
+    nombre = data.get("nombre")
+    fecha_lanzamiento = data.get("fecha_lanzamiento")
+    rating = data.get("rating")
+
+    if not all([nombre, fecha_lanzamiento, rating is not None]):
+        return jsonify({"error": "Faltan datos"}), 400
+
+    try:
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute("""
+                UPDATE juegos
+                SET nombre = %s,
+                    fecha_lanzamiento = %s,
+                    rating = %s
+                WHERE id = %s;
+            """, (nombre, fecha_lanzamiento, rating, juego_id))
+
+            if cur.rowcount == 0:
+                return jsonify({"error": "Juego no encontrado"}), 404
+
+            conn.commit()
+        return jsonify({"mensaje": "Juego actualizado con éxito"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/juegos/todos", methods=["GET"])
+def obtener_todos_juegos():
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute("""
+            SELECT id, nombre FROM juegos ORDER BY nombre;
+        """)
+        juegos = cur.fetchall()
+
+    return jsonify([{"id": j[0], "nombre": j[1]} for j in juegos])
+
 # Puedes agregar más rutas como:
 # - /api/generos
 # - /api/juegos/<int:id>
