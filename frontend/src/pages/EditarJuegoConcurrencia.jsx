@@ -72,7 +72,7 @@ const EditarJuegoConcurrencia = ({ usuario }) => {
         nombre,
         fecha_lanzamiento: fecha,
         rating: parseFloat(rating),
-        usuario_id: usuario.id,
+        usuario_simulado: usuario.nombre,
       });
 
       alert("Juego actualizado con éxito");

@@ -28,7 +28,7 @@ def get_conn():
         password=result.password,
         host=result.hostname,
         port=result.port,
-        options=f"-c application_name={usuario_simulado}"
+        options=f"-c application_name='{usuario_simulado}'"
     )
 
 # -------------------------------
@@ -323,18 +323,32 @@ def insertar_juego():
         return jsonify({"error": str(e)}), 500
 
 
+from flask import g
+
+from flask import g  # Asegúrate de tener esto arriba
+
 @app.route("/api/juegos/<int:juego_id>", methods=["PUT"])
 def actualizar_juego(juego_id):
     data = request.get_json(force=True)
+
     nombre = data.get("nombre")
     fecha_lanzamiento = data.get("fecha_lanzamiento")
     rating = data.get("rating")
+    usuario_simulado = data.get("usuario_simulado")  # 👈
 
-    if not all([nombre, fecha_lanzamiento, rating is not None]):
+    if not all([nombre, fecha_lanzamiento, rating is not None, usuario_simulado]):
         return jsonify({"error": "Faltan datos"}), 400
 
+    g.usuario_simulado = usuario_simulado  # 👈 Establecerlo antes de get_conn()
+
     try:
-        with get_conn() as conn, conn.cursor() as cur:
+        conn = get_conn()
+        conn.autocommit = False
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM juegos WHERE id = %s FOR UPDATE;", (juego_id,))
+            if not cur.fetchone():
+                return jsonify({"error": "Juego no encontrado"}), 404
+
             cur.execute("""
                 UPDATE juegos
                 SET nombre = %s,
@@ -343,13 +357,15 @@ def actualizar_juego(juego_id):
                 WHERE id = %s;
             """, (nombre, fecha_lanzamiento, rating, juego_id))
 
-            if cur.rowcount == 0:
-                return jsonify({"error": "Juego no encontrado"}), 404
-
             conn.commit()
+
         return jsonify({"mensaje": "Juego actualizado con éxito"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    finally:
+        conn.close()
+
+
 
 @app.route("/api/juegos/todos", methods=["GET"])
 def obtener_todos_juegos():
