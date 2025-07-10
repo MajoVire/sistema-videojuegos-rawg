@@ -1,27 +1,46 @@
 import React, { useEffect, useState } from "react";
+import apiUrl from "../apiConfig";
 
-const UsuarioSelector = () => {
+/**
+ * Selector de usuarios simulados.
+ * @param {Function} onSelect - Callback que recibe el objeto usuario seleccionado.
+ */
+const UsuarioSelector = ({ onSelect }) => {
   const [usuarios, setUsuarios] = useState([]);
-  const [seleccionado, setSeleccionado] = useState(localStorage.getItem("usuario_simulado") || "");
+  const [seleccionado, setSeleccionado] = useState(
+    localStorage.getItem("usuario_simulado_id") || ""
+  );
 
+  // ① Cargar usuarios al montar
   useEffect(() => {
-    const fetchUsuarios = async () => {
-      try {
-        const res = await fetch("http://localhost:5000/api/usuarios");
-        const data = await res.json();
-        setUsuarios(data);
-      } catch (error) {
-        console.error("Error al cargar usuarios:", error);
+  const fetchUsuarios = async () => {
+    try {
+      const res = await fetch(`${apiUrl}/api/usuarios`);
+      const data = await res.json();
+      setUsuarios(data);
+
+      // Si había un id guardado, establece el usuario actual
+      if (data.length && seleccionado) {
+        const usr = data.find((u) => u.id === Number(seleccionado));
+        if (usr && onSelect) onSelect(usr);
       }
-    };
+    } catch (error) {
+      console.error("Error al cargar usuarios:", error);
+    }
+  };
 
-    fetchUsuarios();
-  }, []);
+  fetchUsuarios();
+}, [onSelect, seleccionado]); 
 
+
+  // ② Manejar cambio de selección
   const handleChange = (e) => {
-    const valor = e.target.value;
-    setSeleccionado(valor);
-    localStorage.setItem("usuario_simulado", valor);
+    const userId = e.target.value;
+    setSeleccionado(userId);
+    localStorage.setItem("usuario_simulado_id", userId);
+
+    const usuarioObj = usuarios.find((u) => u.id === Number(userId));
+    if (onSelect && usuarioObj) onSelect(usuarioObj);
   };
 
   return (
@@ -29,6 +48,7 @@ const UsuarioSelector = () => {
       <label className="block font-semibold mb-2 text-sm text-gray-700">
         Selecciona un usuario simulado:
       </label>
+
       <select
         value={seleccionado}
         onChange={handleChange}
@@ -36,7 +56,7 @@ const UsuarioSelector = () => {
       >
         <option value="">-- Selecciona un usuario --</option>
         {usuarios.map((user) => (
-          <option key={user.id} value={user.nombre}>
+          <option key={user.id} value={user.id}>
             {user.nombre} ({user.correo})
           </option>
         ))}

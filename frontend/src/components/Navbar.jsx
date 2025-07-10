@@ -11,6 +11,7 @@ const Navbar = () => {
         <li><Link to="/insertar" className="hover:text-indigo-600">Insertar</Link></li>
         <li><Link to="/auditoria" className="hover:text-indigo-600">Auditoría</Link></li>
         <li><Link to="/consultas" className="hover:text-indigo-600">Consultas</Link></li>
+        <li><Link to="/editar-concurrencia">Concurrencia</Link></li>
       </ul>
     </nav>
   );

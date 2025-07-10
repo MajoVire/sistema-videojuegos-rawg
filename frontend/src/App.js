@@ -6,6 +6,8 @@ import Juegos from "./pages/Juegos";
 import InsertarJuego from "./pages/InsertarJuego";
 import Auditoria from "./pages/Auditoria";
 import Consultas from "./pages/Consultas";
+import EditarJuegoConcurrencia from "./pages/EditarJuegoConcurrencia";
+
 
 function App() {
   const [usuarioActual, setUsuarioActual] = useState(null);
@@ -20,6 +22,7 @@ function App() {
           <Route path="/insertar" element={<InsertarJuego usuario={usuarioActual} />} />
           <Route path="/auditoria" element={<Auditoria />} />
           <Route path="/consultas" element={<Consultas />} />
+          <Route path="/editar-concurrencia" element={<EditarJuegoConcurrencia usuario={usuarioActual} />} />
         </Routes>
       </div>
     </Router>

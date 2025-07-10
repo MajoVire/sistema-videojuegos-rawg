@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import apiUrl from "../apiConfig";
 
 function Gamelist() {
   const [juegos, setJuegos] = useState([]);
@@ -12,18 +13,18 @@ function Gamelist() {
 
   // Cargar géneros y plataformas al iniciar
   useEffect(() => {
-    fetch("http://localhost:5000/api/generos")
+    fetch(`${apiUrl}/api/generos`)
       .then(res => res.json())
       .then(data => setGeneros(data));
 
-    fetch("http://localhost:5000/api/plataformas")
+    fetch(`${apiUrl}/api/plataformas`)
       .then(res => res.json())
       .then(data => setPlataformas(data));
   }, []);
 
   // Cargar juegos
   useEffect(() => {
-    let url = `http://localhost:5000/api/juegos/filtrar?page=${pagina}&limit=${porPagina}`;
+    let url = `${apiUrl}/api/juegos/filtrar?page=${pagina}&limit=${porPagina}`;
     if (genero) url += `&genero=${encodeURIComponent(genero)}`;
     if (plataforma) url += `&plataforma=${encodeURIComponent(plataforma)}`;
 

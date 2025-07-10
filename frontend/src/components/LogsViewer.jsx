@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
+import apiUrl from "../apiConfig";
 
 function LogsViewer() {
   const [logs, setLogs] = useState([]);
 
   useEffect(() => {
-    fetch("http://localhost:5000/logs")  // Endpoint que devuelve logs
+    fetch(`${apiUrl}/logs`)  // Endpoint que devuelve logs
       .then((res) => res.json())
       .then((data) => setLogs(data));
   }, []);

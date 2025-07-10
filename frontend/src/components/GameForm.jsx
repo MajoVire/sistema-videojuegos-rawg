@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Select from "react-select";
 import AsyncSelect from "react-select/async";
+import apiUrl from "../apiConfig";
 
 const GameForm = () => {
   const [nombre, setNombre] = useState("");
@@ -18,8 +19,8 @@ const GameForm = () => {
   useEffect(() => {
     const cargarDatos = async () => {
       const endpoints = [
-        { url: "http://localhost:5000/api/generos", setter: setGeneros },
-        { url: "http://localhost:5000/api/plataformas", setter: setPlataformas },
+        { url: `${apiUrl}/api/generos`, setter: setGeneros },
+        { url: `${apiUrl}/api/plataformas`, setter: setPlataformas },
       ];
       for (const { url, setter } of endpoints) {
         try {
@@ -35,7 +36,7 @@ const GameForm = () => {
   }, []);
 
   const cargarOpciones = async (inputValue, tipo) => {
-    const res = await fetch(`http://localhost:5000/api/${tipo}?q=${inputValue}`);
+    const res = await fetch(`${apiUrl}/api/${tipo}?q=${inputValue}`);
     const data = await res.json();
     return data.map((item) => ({ value: item.id, label: item.nombre }));
   };
@@ -61,7 +62,7 @@ const GameForm = () => {
     };
 
     try {
-      const res = await fetch("http://localhost:5000/api/juegos/insertar", {
+      const res = await fetch(`${apiUrl}/api/juegos/insertar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
