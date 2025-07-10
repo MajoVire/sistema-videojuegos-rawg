@@ -3,29 +3,56 @@ import axios from "axios";
 import apiUrl from "../apiConfig";
 
 const EditarJuegoConcurrencia = ({ usuario }) => {
-  const [activos, setActivos] = useState(0);
+  const [activos, setActivos] = useState([]);
 
   useEffect(() => {
-    const intervalo = setInterval(() => {
+    if (!usuario || !usuario.id) return;
+
+    // Enviar ping cada 5 segundos
+    const ping = () => {
+      console.log("Enviando ping:", { usuario_id: usuario.id });
+
+      axios.post(
+        `${apiUrl}/api/ping`,
+        { usuario_id: usuario.id },
+        { headers: { "Content-Type": "application/json" } }
+      ).catch(console.error);
+    };
+
+    ping();
+    const pingInterval = setInterval(ping, 5000);
+
+    // Consultar usuarios activos cada 3 segundos
+    const cargarActivos = () => {
       axios
         .get(`${apiUrl}/api/usuarios/activos`)
-        .then((res) => setActivos(res.data.activos))
-        .catch(() => setActivos(0));
-    }, 2000);
+        .then((res) => setActivos(res.data))
+        .catch(() => setActivos([]));
+    };
 
-    // Consulta inicial inmediata
-    axios
-      .get(`${apiUrl}/api/usuarios/activos`)
-      .then((res) => setActivos(res.data.activos))
-      .catch(() => setActivos(0));
+    cargarActivos();
+    const activosInterval = setInterval(cargarActivos, 3000);
 
-    return () => clearInterval(intervalo);
-  }, []);
+    return () => {
+      clearInterval(pingInterval);
+      clearInterval(activosInterval);
+    };
+  }, [usuario?.id]);
+
+  if (!usuario) {
+    return <p className="p-6 text-gray-500">Cargando usuario...</p>;
+  }
 
   return (
     <div className="p-6">
-      <h2 className="text-xl font-bold mb-4">Usuarios activos actualmente</h2>
-      <p className="text-4xl font-bold text-green-600">{activos}</p>
+      <h2 className="text-xl font-bold mb-4">Usuarios en línea</h2>
+      <ul className="space-y-2">
+        {activos.map((u) => (
+          <li key={u.id} className="bg-green-100 p-2 rounded">
+            🟢 {u.nombre} ({u.correo})
+          </li>
+        ))}
+      </ul>
     </div>
   );
 };

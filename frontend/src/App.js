@@ -22,7 +22,7 @@ function App() {
           <Route path="/insertar" element={<InsertarJuego usuario={usuarioActual} />} />
           <Route path="/auditoria" element={<Auditoria />} />
           <Route path="/consultas" element={<Consultas />} />
-          <Route path="/editar-concurrencia" element={<EditarJuegoConcurrencia/>} />
+          <Route path="/editar-concurrencia" element={<EditarJuegoConcurrencia usuario={usuarioActual} />} />
         </Routes>
       </div>
     </Router>

@@ -210,42 +210,44 @@ def bloquear_juego(juego_id):
         return jsonify({"error": str(e)}), 500
 
 # ---------- heartbeat ----------
+
 @app.route("/api/ping", methods=["POST"])
-def ping():
-    user_id = request.json.get("user_id")
-    if not user_id:
-        return jsonify({"error": "user_id requerido"}), 400
+def ping_usuario():
+    data = request.get_json(force=True)  # ✅ fuerza el parseo del JSON
+    usuario_id = data.get("usuario_id")
+
+    if not usuario_id:
+        return jsonify({"error": "Falta usuario_id"}), 400
 
     with get_conn() as conn, conn.cursor() as cur:
-        cur.execute("""
-            UPDATE usuarios_simulados
-            SET ultima_ping = NOW()
-            WHERE id = %s
-        """, (user_id,))
-        if cur.rowcount == 0:
-            # Alta automática si no existe
-            cur.execute("""
-                INSERT INTO usuarios_simulados (id, nombre, ultima_ping)
-                VALUES (%s, %s, NOW())
-            """, (user_id, f"User {user_id}"))
+        cur.execute(
+            "UPDATE usuarios_simulados SET ultima_ping = %s WHERE id = %s",
+            (datetime.now(timezone.utc), usuario_id)
+        )
+        conn.commit()
 
     return jsonify({"status": "ok"})
 
-# ---------- cuántos están activos ----------
+
 @app.route("/api/usuarios/activos", methods=["GET"])
 def usuarios_activos():
-    ventana = int(request.args.get("ventana", 15))   # segundos
+    ventana = int(request.args.get("ventana", 15))  # segundos
     limite = datetime.now(timezone.utc) - timedelta(seconds=ventana)
 
     with get_conn() as conn, conn.cursor() as cur:
         cur.execute("""
-            SELECT COUNT(*) 
+            SELECT id, nombre, correo
             FROM usuarios_simulados
             WHERE ultima_ping >= %s
         """, (limite,))
-        activos = cur.fetchone()[0]
+        rows = cur.fetchall()
 
-    return jsonify({"activos": activos, "ventana_seg": ventana})
+    activos = [
+        {"id": row[0], "nombre": row[1], "correo": row[2]}
+        for row in rows
+    ]
+
+    return jsonify(activos)
 # Puedes agregar más rutas como:
 # - /api/generos
 # - /api/juegos/<int:id>
