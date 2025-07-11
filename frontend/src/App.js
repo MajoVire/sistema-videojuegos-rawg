@@ -10,7 +10,10 @@ import EditarJuegoConcurrencia from "./pages/EditarJuegoConcurrencia";
 
 
 function App() {
-  const [usuarioActual, setUsuarioActual] = useState(null);
+  const [usuarioActual, setUsuarioActual] = useState(() => {
+  const saved = localStorage.getItem("usuario_simulado");
+  return saved ? JSON.parse(saved) : null;
+});
 
   return (
     <Router>
@@ -19,7 +22,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Home setUsuarioActual={setUsuarioActual} />} />
           <Route path="/juegos" element={<Juegos usuario={usuarioActual} />} />
-          <Route path="/insertar" element={<InsertarJuego usuario={usuarioActual} />} />
+          <Route path="/insertar" element={<InsertarJuego key={usuarioActual?.id} usuario={usuarioActual} />} />
           <Route path="/auditoria" element={<Auditoria />} />
           <Route path="/consultas" element={<Consultas />} />
           <Route path="/editar-concurrencia" element={<EditarJuegoConcurrencia usuario={usuarioActual} />} />

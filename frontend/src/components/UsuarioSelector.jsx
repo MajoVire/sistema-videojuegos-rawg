@@ -11,7 +11,7 @@ const UsuarioSelector = ({ onSelect }) => {
     localStorage.getItem("usuario_simulado_id") || ""
   );
 
-  // ① Cargar usuarios al montar
+  // Cargar usuarios al montar
   useEffect(() => {
   const fetchUsuarios = async () => {
     try {
@@ -33,15 +33,20 @@ const UsuarioSelector = ({ onSelect }) => {
 }, [onSelect, seleccionado]); 
 
 
-  // ② Manejar cambio de selección
   const handleChange = (e) => {
     const userId = e.target.value;
     setSeleccionado(userId);
     localStorage.setItem("usuario_simulado_id", userId);
 
     const usuarioObj = usuarios.find((u) => u.id === Number(userId));
-    if (onSelect && usuarioObj) onSelect(usuarioObj);
+    if (usuarioObj) {
+      // ✅ Guardar el objeto completo como JSON válido
+      localStorage.setItem("usuario_simulado", JSON.stringify(usuarioObj));
+      if (onSelect) onSelect(usuarioObj);
+    }
   };
+
+
 
   return (
     <div className="mb-4">
