@@ -46,6 +46,7 @@ Desde la carpeta `frontend`:
 
 ```bash
 npm install
+npm install recharts
 ```
 
 ## 🔹 Backend (Python + Flask)

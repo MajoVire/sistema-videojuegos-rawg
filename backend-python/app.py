@@ -386,6 +386,69 @@ def obtener_todos_juegos():
 
     return jsonify([{"id": j[0], "nombre": j[1]} for j in juegos])
 
+@app.route("/api/estadisticas/generos", methods=["GET"])
+def estadisticas_por_genero():
+    with get_conn() as conn, conn.cursor() as cur:
+        # EXPLAIN ANALYZE
+        cur.execute("EXPLAIN ANALYZE SELECT * FROM estadisticas_juegos_por_genero();")
+        plan = [row[0] for row in cur.fetchall()]
+
+        # Llamar función real
+        cur.execute("SELECT * FROM estadisticas_juegos_por_genero();")
+        datos = cur.fetchall()
+
+    return jsonify({
+        "datos": [{"genero": g, "total": t} for g, t in datos],
+        "plan": plan
+    })
+    
+@app.route("/api/estadisticas/top3-genero-funcion", methods=["GET"])
+def top3_por_genero_funcion():
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute("EXPLAIN ANALYZE SELECT * FROM top3_juegos_por_genero();")
+        plan = [row[0] for row in cur.fetchall()]
+
+        cur.execute("SELECT * FROM top3_juegos_por_genero();")
+        resultados = cur.fetchall()
+
+    return jsonify({
+        "resultados": [
+            {
+                "id": row[0],
+                "nombre": row[1],
+                "rating": row[2],
+                "genero": row[3]
+            } for row in resultados
+        ],
+        "plan": plan
+    })
+    
+@app.route("/api/estadisticas/top3-genero-funcion-opt", methods=["GET"])
+def top3_por_genero_funcion_opt():
+    with get_conn() as conn, conn.cursor() as cur:
+        # Obtener plan EXPLAIN ANALYZE para la función optimizada
+        cur.execute("""
+            EXPLAIN ANALYZE
+            SELECT * FROM top3_juegos_por_genero_optimizado();
+        """)
+        plan = cur.fetchall()
+
+        # Ejecutar la función optimizada
+        cur.execute("SELECT * FROM top3_juegos_por_genero_optimizado();")
+        resultados = cur.fetchall()
+
+    # Armar JSON para frontend
+    return jsonify({
+        "resultados": [
+            {
+                "id": row[0],
+                "nombre": row[1],
+                "rating": float(row[2]) if row[2] is not None else None,
+                "genero": row[3]
+            } for row in resultados
+        ],
+        "plan": [line[0] for line in plan]
+    })
 # -------------------------------
 # Iniciar el servidor
 # -------------------------------
