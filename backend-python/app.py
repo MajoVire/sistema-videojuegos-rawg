@@ -328,7 +328,7 @@ from flask import g
 from flask import g  # Asegúrate de tener esto arriba
 
 @app.route("/api/juegos/<int:juego_id>", methods=["PUT"])
-def actualizar_juego(juego_id):
+def actualizar_juego_endpoint(juego_id):
     data = request.get_json(force=True)
 
     nombre = data.get("nombre")
@@ -348,22 +348,10 @@ def actualizar_juego(juego_id):
         conn.autocommit = False
 
         with conn.cursor() as cur:
-            # Esta línea es CLAVE para que PostgreSQL registre bien el usuario
-            cur.execute("SET application_name = %s;", (usuario_simulado,))
-
-            # Bloquear el registro con SELECT FOR UPDATE
-            cur.execute("SELECT id FROM juegos WHERE id = %s FOR UPDATE;", (juego_id,))
-            if not cur.fetchone():
-                return jsonify({"error": "Juego no encontrado"}), 404
-
-            # Hacer el UPDATE
+            # Llamar a la función SQL que actualiza el juego
             cur.execute("""
-                UPDATE juegos
-                SET nombre = %s,
-                    fecha_lanzamiento = %s,
-                    rating = %s
-                WHERE id = %s;
-            """, (nombre, fecha_lanzamiento, rating, juego_id))
+                SELECT actualizar_juego(%s, %s, %s, %s);
+            """, (juego_id, nombre, fecha_lanzamiento, rating))
 
         conn.commit()
         return jsonify({"mensaje": "Juego actualizado con éxito"})
@@ -374,7 +362,6 @@ def actualizar_juego(juego_id):
 
     finally:
         conn.close()
-
 
 @app.route("/api/juegos/todos", methods=["GET"])
 def obtener_todos_juegos():
