@@ -11,9 +11,16 @@ import EditarJuegoConcurrencia from "./pages/EditarJuegoConcurrencia";
 
 function App() {
   const [usuarioActual, setUsuarioActual] = useState(() => {
-  const saved = localStorage.getItem("usuario_simulado");
-  return saved ? JSON.parse(saved) : null;
-});
+    const saved = localStorage.getItem("usuario_simulado");
+    try {
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      console.warn("Valor inválido en localStorage: usuario_simulado. Limpiando...");
+      localStorage.removeItem("usuario_simulado");
+      return null;
+    }
+  });
+
 
   return (
     <Router>

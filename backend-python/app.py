@@ -348,15 +348,15 @@ def actualizar_juego(juego_id):
         conn.autocommit = False
 
         with conn.cursor() as cur:
-            # 👇 Esta línea es CLAVE para que PostgreSQL registre bien el usuario
+            # Esta línea es CLAVE para que PostgreSQL registre bien el usuario
             cur.execute("SET application_name = %s;", (usuario_simulado,))
 
-            # 👇 Bloquear el registro con SELECT FOR UPDATE
+            # Bloquear el registro con SELECT FOR UPDATE
             cur.execute("SELECT id FROM juegos WHERE id = %s FOR UPDATE;", (juego_id,))
             if not cur.fetchone():
                 return jsonify({"error": "Juego no encontrado"}), 404
 
-            # 👇 Hacer el UPDATE
+            # Hacer el UPDATE
             cur.execute("""
                 UPDATE juegos
                 SET nombre = %s,

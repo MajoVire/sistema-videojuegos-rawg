@@ -40,7 +40,7 @@ const UsuarioSelector = ({ onSelect }) => {
 
     const usuarioObj = usuarios.find((u) => u.id === Number(userId));
     if (usuarioObj) {
-      // ✅ Guardar el objeto completo como JSON válido
+      // Guardar el objeto completo como JSON válido
       localStorage.setItem("usuario_simulado", JSON.stringify(usuarioObj));
       if (onSelect) onSelect(usuarioObj);
     }
