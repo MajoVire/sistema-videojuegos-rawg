@@ -343,6 +343,9 @@ def actualizar_juego_endpoint(juego_id):
         conn.autocommit = False
 
         with conn.cursor() as cur:
+            # Establecer el aplicación_name para identificar al usuario simulado
+            cur.execute("SET application_name = %s;", (usuario_simulado,))
+            
             # Llamar a la función SQL que actualiza el juego
             cur.execute("""
                 SELECT actualizar_juego(%s, %s, %s, %s);
