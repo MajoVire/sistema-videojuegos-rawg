@@ -3,7 +3,7 @@ import Select from "react-select";
 import AsyncSelect from "react-select/async";
 import apiUrl from "../apiConfig";
 
-const GameForm = () => {
+const GameForm = ({ usuario }) => {
   const [nombre, setNombre] = useState("");
   const [fecha, setFecha] = useState("");
   const [rating, setRating] = useState("");
@@ -44,17 +44,17 @@ const GameForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const usuario = localStorage.getItem("usuario_simulado");
+    const usuario = JSON.parse(localStorage.getItem("usuario_simulado"));
+    
     if (!usuario) {
-      alert("Selecciona un usuario simulado primero");
-      return;
+      return <p>Cargando usuario simulado...</p>;
     }
 
     const data = {
       nombre,
       fecha,
       rating,
-      usuario_simulado: usuario,
+      usuario_simulado: usuario.nombre,
       generos: generosSeleccionados.map((g) => g.value),
       plataformas: plataformasSeleccionadas.map((p) => p.value),
       desarrolladores: desarrolladoresSeleccionados.map((d) => d.value),
