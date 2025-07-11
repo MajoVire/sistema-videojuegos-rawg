@@ -22,8 +22,14 @@ const UsuarioSelector = ({ onSelect }) => {
       // Si había un id guardado, establece el usuario actual
       if (data.length && seleccionado) {
         const usr = data.find((u) => u.id === Number(seleccionado));
-        if (usr && onSelect) onSelect(usr);
+        if (usr) {
+          localStorage.setItem("usuario_simulado", JSON.stringify(usr)); // 🔧 ¡Aquí lo forzamos bien!
+          if (onSelect) onSelect(usr);
+        } else {
+          localStorage.removeItem("usuario_simulado");
+        }
       }
+
     } catch (error) {
       console.error("Error al cargar usuarios:", error);
     }
@@ -40,13 +46,11 @@ const UsuarioSelector = ({ onSelect }) => {
 
     const usuarioObj = usuarios.find((u) => u.id === Number(userId));
     if (usuarioObj) {
-      // Guardar el objeto completo como JSON válido
+      // Guarda el objeto completo como JSON stringificado
       localStorage.setItem("usuario_simulado", JSON.stringify(usuarioObj));
       if (onSelect) onSelect(usuarioObj);
     }
   };
-
-
 
   return (
     <div className="mb-4">

@@ -44,8 +44,16 @@ const GameForm = ({ usuario }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const usuario = JSON.parse(localStorage.getItem("usuario_simulado"));
-    
+    let usuario;
+  try {
+    const raw = localStorage.getItem("usuario_simulado");
+    usuario = raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    console.warn("Usuario simulado malformado. Limpiando localStorage...");
+    localStorage.removeItem("usuario_simulado");
+    usuario = null;
+  }
+
     if (!usuario) {
       return <p>Cargando usuario simulado...</p>;
     }
@@ -54,35 +62,43 @@ const GameForm = ({ usuario }) => {
       nombre,
       fecha,
       rating,
-      usuario_simulado: usuario.nombre,
       generos: generosSeleccionados.map((g) => g.value),
       plataformas: plataformasSeleccionadas.map((p) => p.value),
       desarrolladores: desarrolladoresSeleccionados.map((d) => d.value),
       etiquetas: etiquetasSeleccionadas.map((e) => e.value),
     };
 
-    try {
-      const res = await fetch(`${apiUrl}/api/juegos/insertar`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
+  try {
+    const res = await fetch(`${apiUrl}/api/juegos/insertar`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Usuario-Simulado": usuario.correo,
+      },
+      body: JSON.stringify(data),
+    });
 
-      if (!res.ok) throw new Error(await res.text());
+    const responseBody = await res.text(); // 👈 importante para ver qué responde
 
-      alert("Juego insertado correctamente");
-      // Limpiar
-      setNombre("");
-      setFecha("");
-      setRating("");
-      setGenerosSeleccionados([]);
-      setPlataformasSeleccionadas([]);
-      setDesarrolladoresSeleccionados([]);
-      setEtiquetasSeleccionadas([]);
-    } catch (err) {
-      console.error("Error:", err);
-      alert("Error al insertar juego");
-    }
+    console.log("Respuesta cruda del servidor:", responseBody);
+
+    if (!res.ok) throw new Error(responseBody);
+
+    alert("Juego insertado correctamente");
+
+    // Limpiar
+    setNombre("");
+    setFecha("");
+    setRating("");
+    setGenerosSeleccionados([]);
+    setPlataformasSeleccionadas([]);
+    setDesarrolladoresSeleccionados([]);
+    setEtiquetasSeleccionadas([]);
+  } catch (err) {
+    console.error("Error al insertar juego:", err);
+    alert("Error al insertar juego");
+  }
+
   };
 
   return (

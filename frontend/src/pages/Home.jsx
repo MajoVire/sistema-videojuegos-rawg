@@ -4,9 +4,10 @@ import UsuarioSelector from "../components/UsuarioSelector";
 
 const Home = ({ setUsuarioActual }) => {
   const handleSeleccionUsuario = (usuario) => {
-    localStorage.setItem("usuario_simulado", usuario.nombre); // 👈 Guarda nombre limpio
-    setUsuarioActual(usuario); // actualiza estado global si es necesario
+    localStorage.setItem("usuario_simulado", JSON.stringify(usuario)); // <== CORREGIDO
+    setUsuarioActual(usuario);
   };
+
 
   return (
     <div className="flex justify-center items-center min-h-screen bg-gray-100">

@@ -282,7 +282,7 @@ def insertar_juego():
         nombre = data.get("nombre")
         fecha = data.get("fecha") or None
         rating = data.get("rating") or None
-        usuario_simulado = data.get("usuario_simulado")
+        usuario_simulado = request.headers.get("X-Usuario-Simulado")
 
         generos = data.get("generos", [])
         plataformas = data.get("plataformas", [])
@@ -321,11 +321,6 @@ def insertar_juego():
     except Exception as e:
         print("Error al insertar juego:", e)
         return jsonify({"error": str(e)}), 500
-
-
-from flask import g
-
-from flask import g  # Asegúrate de tener esto arriba
 
 @app.route("/api/juegos/<int:juego_id>", methods=["PUT"])
 def actualizar_juego_endpoint(juego_id):

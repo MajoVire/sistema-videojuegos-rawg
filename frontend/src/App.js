@@ -8,7 +8,6 @@ import Auditoria from "./pages/Auditoria";
 import Consultas from "./pages/Consultas";
 import EditarJuegoConcurrencia from "./pages/EditarJuegoConcurrencia";
 
-
 function App() {
   const [usuarioActual, setUsuarioActual] = useState(() => {
     const saved = localStorage.getItem("usuario_simulado");
