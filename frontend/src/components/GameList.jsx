@@ -9,6 +9,7 @@ function Gamelist() {
   const [plataforma, setPlataforma] = useState("");
   const [generos, setGeneros] = useState([]);
   const [plataformas, setPlataformas] = useState([]);
+  const [plan, setPlan] = useState([]);
   const porPagina = 12;
 
   // Cargar géneros y plataformas al iniciar
@@ -35,11 +36,13 @@ function Gamelist() {
       .then(data => {
         setJuegos(data.juegos || []);
         setTotal(data.total || 0);
+        setPlan(data.plan || []);
       })
       .catch(error => {
         console.error("Error cargando juegos:", error);
         setJuegos([]);
         setTotal(0);
+        setPlan([]);
       });
   }, [pagina, genero, plataforma]);
 
@@ -116,6 +119,14 @@ function Gamelist() {
         >
           Siguiente
         </button>
+      </div>
+
+      {/* EXPLAIN ANALYZE Plan */}
+      <div className="bg-white shadow rounded-xl p-4 mt-6">
+        <h2 className="text-xl font-semibold mb-4">EXPLAIN ANALYZE (plan de ejecución del filtro)</h2>
+        <pre className="text-sm text-gray-700 overflow-x-auto whitespace-pre-wrap">
+          {plan.join('\n')}
+        </pre>
       </div>
     </div>
   );

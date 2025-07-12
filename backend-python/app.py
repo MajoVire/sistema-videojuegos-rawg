@@ -122,7 +122,6 @@ def listar_juegos():
 def filtrar_juegos():
     genero = request.args.get("genero")
     plataforma = request.args.get("plataforma")
-    # Asegura que page nunca sea menor que 1
     page = max(1, int(request.args.get("page", 1)))
     limit = int(request.args.get("limit", 12))
     offset = (page - 1) * limit
@@ -132,15 +131,19 @@ def filtrar_juegos():
     plataforma = None if plataforma == "" else plataforma
 
     try:
-        print("Ejecutando función filtrar_juegos_func...")
+
         with get_conn() as conn:
             with conn.cursor() as cur:
-                query = """SELECT * FROM filtrar_juegos_func(%s, %s, %s, %s);"""
+                query = """SELECT * FROM filtrar_juegos_func_optimizado(%s, %s, %s, %s);"""
                 cur.execute(query, (genero, plataforma, limit, offset))
                 juegos = cur.fetchall()
+                
+                 # Obtener EXPLAIN ANALYZE para el conteo
+                cur.execute("EXPLAIN ANALYZE SELECT filtrar_juegos_func_optimizado(%s, %s);", (genero, plataforma))
+                plan = [row[0] for row in cur.fetchall()]
 
-                print("Ejecutando función contar_juegos_func...")
-                count_query = "SELECT contar_juegos_func(%s, %s);"
+
+                count_query = "SELECT contar_juegos_func_optimizado(%s, %s);"
                 cur.execute(count_query, (genero, plataforma))
                 total = cur.fetchone()[0]
 
@@ -153,7 +156,8 @@ def filtrar_juegos():
                     "rating": row[3]
                 } for row in juegos
             ],
-            "total": total
+            "total": total,
+            "plan": plan
         }
 
         return jsonify(resultado)
@@ -443,6 +447,7 @@ def top3_por_genero_funcion():
         cur.execute("SELECT * FROM top3_juegos_por_genero();")
         resultados = cur.fetchall()
 
+    # Armar JSON para frontend
     return jsonify({
         "resultados": [
             {
