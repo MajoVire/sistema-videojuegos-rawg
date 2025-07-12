@@ -57,15 +57,15 @@ def asignar_usuario_simulado():
 def listar_generos():
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT id, nombre FROM generos ORDER BY nombre;")
-            generos = cur.fetchall()
+            cur.callproc("obtener_generos")
+            generos = cur.fetchall()    
     return jsonify([{"id": g[0], "nombre": g[1]} for g in generos])
 
 @app.route("/api/plataformas", methods=["GET"])
 def listar_plataformas():
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT id, nombre FROM plataformas ORDER BY nombre;")
+            cur.callproc("obtener_plataformas")
             plataformas = cur.fetchall()
     return jsonify([{"id": p[0], "nombre": p[1]} for p in plataformas])
 
@@ -74,10 +74,7 @@ def listar_desarrolladores():
     q = request.args.get("q", "").lower()
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT id, nombre FROM desarrolladores WHERE LOWER(nombre) LIKE %s ORDER BY nombre LIMIT 20;",
-                (f"%{q}%",)
-            )
+            cur.callproc("buscar_desarrolladores", (q,))
             resultados = cur.fetchall()
     return jsonify([{"id": r[0], "nombre": r[1]} for r in resultados])
 
@@ -86,30 +83,22 @@ def listar_etiquetas():
     q = request.args.get("q", "").lower()
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute(
-                "SELECT id, nombre FROM etiquetas WHERE LOWER(nombre) LIKE %s ORDER BY nombre LIMIT 20;",
-                (f"%{q}%",)
-            )
+            cur.callproc("buscar_etiquetas", (q,))
             resultados = cur.fetchall()
     return jsonify([{"id": r[0], "nombre": r[1]} for r in resultados])
 
 @app.route("/api/juegos", methods=["GET"])
 def listar_juegos():
-    page = int(request.args.get("page", 1))  # Página actual, por defecto 1
-    limit = int(request.args.get("limit", 12))  # Juegos por página
+    page = int(request.args.get("page", 1))
+    limit = int(request.args.get("limit", 12))
     offset = (page - 1) * limit
 
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute("""
-                SELECT id, nombre, fecha_lanzamiento, rating
-                FROM juegos
-                ORDER BY id
-                LIMIT %s OFFSET %s;
-            """, (limit, offset))
+            cur.callproc("listar_juegos_paginado", (limit, offset))
             juegos = cur.fetchall()
 
-            cur.execute("SELECT COUNT(*) FROM juegos;")
+            cur.callproc("contar_juegos")
             total_juegos = cur.fetchone()[0]
 
     resultado = {
@@ -175,8 +164,8 @@ def filtrar_juegos():
 def obtener_usuarios_simulados():
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT id, nombre, correo FROM usuarios_simulados")
-            usuarios = cur.fetchall()
+            cur.callproc("obtener_usuarios_simulados")
+            usuarios = cur.fetchall()    
     resultado = [
         {"id": row[0], "nombre": row[1], "correo": row[2]}
         for row in usuarios
@@ -191,7 +180,8 @@ def bloquear_juego(juego_id):
         cur = conn.cursor()
 
         # SELECT ... FOR UPDATE bloquea el registro
-        cur.execute("SELECT id, nombre, fecha_lanzamiento, rating FROM juegos WHERE id = %s FOR UPDATE;", (juego_id,))
+        cur.execute("SELECT id FROM juegos WHERE id = %s FOR UPDATE;", (juego_id,))
+        cur.callproc("obtener_juego_por_id", (juego_id,))
         juego = cur.fetchone()
 
         if not juego:
@@ -215,14 +205,9 @@ def bloquear_juego(juego_id):
 @app.route("/api/usuarios/activos", methods=["GET"])
 def usuarios_activos():
     ventana = int(request.args.get("ventana", 15))  # segundos
-    limite = datetime.now(timezone.utc) - timedelta(seconds=ventana)
-    
+
     with get_conn() as conn, conn.cursor() as cur:
-        cur.execute("""
-            SELECT id, nombre, correo
-            FROM usuarios_simulados
-            WHERE ultima_ping >= %s
-        """, (limite,))
+        cur.callproc("obtener_usuarios_activos", (ventana,))
         rows = cur.fetchall()
 
     activos = [
@@ -247,11 +232,7 @@ def ping_usuario():
 def obtener_juego_por_id(juego_id):
     try:
         with get_conn() as conn, conn.cursor() as cur:
-            cur.execute("""
-                SELECT id, nombre, fecha_lanzamiento, rating
-                FROM juegos
-                WHERE id = %s;
-            """, (juego_id,))
+            cur.callproc("obtener_juego_por_id", (juego_id,))
             juego = cur.fetchone()
 
             if not juego:
@@ -270,11 +251,15 @@ def obtener_juego_por_id(juego_id):
 def buscar_usuario_por_correo():
     correo = request.args.get("correo")
     with get_conn() as conn, conn.cursor() as cur:
-        cur.execute("SELECT id FROM usuarios_simulados WHERE correo = %s", (correo,))
-        row = cur.fetchone()
-        if not row:
-            return jsonify({"error": "Usuario no encontrado"}), 404
-        return jsonify({"id": row[0]})
+        try:
+            cur.callproc("buscar_usuario_por_correo", (correo,))
+            user_id = cur.fetchone()[0]
+            return jsonify({"id": user_id})
+        except Exception as e:
+            if 'Usuario no encontrado' in str(e):
+                return jsonify({"error": "Usuario no encontrado"}), 404
+            return jsonify({"error": str(e)}), 500
+
 
 
 @app.route("/api/juegos/insertar", methods=["POST"])
@@ -372,9 +357,7 @@ def actualizar_juego_concurrencia(juego_id):
 @app.route("/api/juegos/todos", methods=["GET"])
 def obtener_todos_juegos():
     with get_conn() as conn, conn.cursor() as cur:
-        cur.execute("""
-            SELECT id, nombre FROM juegos ORDER BY nombre;
-        """)
+        cur.callproc("obtener_todos_juegos")
         juegos = cur.fetchall()
 
     return jsonify([{"id": j[0], "nombre": j[1]} for j in juegos])
