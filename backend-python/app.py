@@ -212,29 +212,13 @@ def bloquear_juego(juego_id):
         return jsonify({"error": str(e)}), 500
 
 # ---------- heartbeat ----------
-
-@app.route("/api/ping", methods=["POST"])
-def ping_usuario():
-    data = request.get_json(force=True)  # ✅ fuerza el parseo del JSON
-    usuario_id = data.get("usuario_id")
-
-    if not usuario_id:
-        return jsonify({"error": "Falta usuario_id"}), 400
-
-    with get_conn() as conn, conn.cursor() as cur:
-        cur.execute(
-            "UPDATE usuarios_simulados SET ultima_ping = %s WHERE id = %s",
-            (datetime.now(timezone.utc), usuario_id)
-        )
-        conn.commit()
-
-    return jsonify({"status": "ok"})
-
-
 @app.route("/api/usuarios/activos", methods=["GET"])
 def usuarios_activos():
     ventana = int(request.args.get("ventana", 15))  # segundos
     limite = datetime.now(timezone.utc) - timedelta(seconds=ventana)
+    
+    print("Hora actual UTC:", datetime.now(timezone.utc))
+    print("Hora actual local:", datetime.now())
 
     with get_conn() as conn, conn.cursor() as cur:
         cur.execute("""
@@ -248,8 +232,24 @@ def usuarios_activos():
         {"id": row[0], "nombre": row[1], "correo": row[2]}
         for row in rows
     ]
-
     return jsonify(activos)
+
+@app.route("/api/usuarios/ping", methods=["POST"])
+def ping_usuario():
+    usuario_id = request.headers.get("X-Usuario-Simulado-Id")
+    if not usuario_id:
+        return jsonify({"error": "Falta el ID del usuario simulado"}), 400
+
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute("""
+            UPDATE usuarios_simulados
+            SET ultima_ping = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """, (usuario_id,))
+        conn.commit()
+
+    return jsonify({"status": "ok"})
+
 
 @app.route("/api/juegos/<int:juego_id>", methods=["GET"])
 def obtener_juego_por_id(juego_id):
@@ -273,33 +273,43 @@ def obtener_juego_por_id(juego_id):
             })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    
+
+@app.route("/api/usuarios/buscar")
+def buscar_usuario_por_correo():
+    correo = request.args.get("correo")
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute("SELECT id FROM usuarios_simulados WHERE correo = %s", (correo,))
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"error": "Usuario no encontrado"}), 404
+        return jsonify({"id": row[0]})
+
+
 @app.route("/api/juegos/insertar", methods=["POST"])
 def insertar_juego():
     try:
+        
         data = request.get_json(force=True)
 
         nombre = data.get("nombre")
         fecha = data.get("fecha") or None
         rating = data.get("rating") or None
-        usuario_simulado = request.headers.get("X-Usuario-Simulado")
-
         generos = data.get("generos", [])
         plataformas = data.get("plataformas", [])
         desarrolladores = data.get("desarrolladores", [])
         etiquetas = data.get("etiquetas", [])
+        usuario_simulado_id = request.headers.get("X-Usuario-Simulado-Id")
 
-        if not nombre or not usuario_simulado:
+        if not nombre or not usuario_simulado_id:
             return jsonify({"error": "Faltan campos obligatorios"}), 400
 
         from flask import g
-        g.usuario_simulado = usuario_simulado
-        print("Usuario simulado:", g.usuario_simulado)
+        g.usuario_simulado = usuario_simulado_id
+        print("Usuario simulado ID:", g.usuario_simulado)
 
-        # Aquí se abre la conexión
         with get_conn() as conn, conn.cursor() as cur:
-            # ⚠️ Forzamos el valor en la sesión PostgreSQL
-            cur.execute("SET application_name = %s;", (usuario_simulado,))
+            cur.execute("SET application_name = %s;", (str(usuario_simulado_id),))
+
 
             # Insertar juego y relaciones
             cur.execute("SELECT insertar_juego(%s, %s, %s);", (nombre, fecha, rating))
@@ -329,13 +339,13 @@ def actualizar_juego_endpoint(juego_id):
     nombre = data.get("nombre")
     fecha_lanzamiento = data.get("fecha_lanzamiento")
     rating = data.get("rating")
-    usuario_simulado = data.get("usuario_simulado")
+    usuario_simulado_id = request.headers.get("X-Usuario-Simulado-Id")
 
-    if not all([nombre, fecha_lanzamiento, rating is not None, usuario_simulado]):
+    if not all([nombre, fecha_lanzamiento, rating is not None, usuario_simulado_id]):
         return jsonify({"error": "Faltan datos"}), 400
 
     from flask import g
-    g.usuario_simulado = usuario_simulado
+    g.usuario_simulado = usuario_simulado_id
     print("Usuario simulado:", g.usuario_simulado)
 
     try:
@@ -344,7 +354,7 @@ def actualizar_juego_endpoint(juego_id):
 
         with conn.cursor() as cur:
             # Establecer el aplicación_name para identificar al usuario simulado
-            cur.execute("SET application_name = %s;", (usuario_simulado,))
+            cur.execute("SET application_name = %s;", (str(usuario_simulado_id),))
             
             # Llamar a la función SQL que actualiza el juego
             cur.execute("""
@@ -360,6 +370,12 @@ def actualizar_juego_endpoint(juego_id):
 
     finally:
         conn.close()
+
+@app.route("/api/juegos/<int:juego_id>/actualizar/concurrente", methods=["PUT"])
+def actualizar_juego_concurrencia(juego_id):
+    # Reutiliza la lógica existente del endpoint principal
+    return actualizar_juego_endpoint(juego_id)
+
 
 @app.route("/api/juegos/todos", methods=["GET"])
 def obtener_todos_juegos():

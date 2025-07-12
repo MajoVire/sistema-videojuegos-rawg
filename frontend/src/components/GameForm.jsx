@@ -73,7 +73,7 @@ const GameForm = ({ usuario }) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Usuario-Simulado": usuario.correo,
+        "X-Usuario-Simulado-Id": usuario.id.toString(),
       },
       body: JSON.stringify(data),
     });

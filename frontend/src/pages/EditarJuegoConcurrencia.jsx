@@ -13,37 +13,40 @@ const EditarJuegoConcurrencia = ({ usuario }) => {
   useEffect(() => {
     if (!usuario || !usuario.id) return;
 
-    // PING
-    const ping = () => {
-      axios
-        .post(`${apiUrl}/api/ping`, { usuario_id: usuario.id })
-        .catch(console.error);
-    };
-    ping();
-    const pingInterval = setInterval(ping, 5000);
+    let isMounted = true;
 
-    // USUARIOS ACTIVOS
+    // Cargar usuarios activos
     const cargarActivos = () => {
       axios
         .get(`${apiUrl}/api/usuarios/activos`)
-        .then((res) => setActivos(res.data))
-        .catch(() => setActivos([]));
+        .then((res) => {
+          if (isMounted) setActivos(res.data);
+        })
+        .catch(() => {
+          if (isMounted) setActivos([]);
+        });
     };
+
     cargarActivos();
     const activosInterval = setInterval(cargarActivos, 3000);
 
-    // LISTA DE JUEGOS
+    // Cargar juegos
     const cargarJuegos = () => {
-      axios.get(`${apiUrl}/api/juegos`).then((res) => setJuegos(res.data.juegos))
-
+      axios.get(`${apiUrl}/api/juegos`)
+        .then((res) => {
+          if (isMounted) setJuegos(res.data.juegos);
+        });
     };
     cargarJuegos();
 
+    // Limpieza
     return () => {
-      clearInterval(pingInterval);
+      isMounted = false;
       clearInterval(activosInterval);
     };
+
   }, [usuario]);
+
 
   // Al seleccionar un juego del combo box
   const handleSeleccionJuego = async (e) => {
@@ -72,7 +75,10 @@ const EditarJuegoConcurrencia = ({ usuario }) => {
         nombre,
         fecha_lanzamiento: fecha,
         rating: parseFloat(rating),
-        usuario_simulado: usuario.nombre,
+      }, {
+        headers: {
+          "X-Usuario-Simulado-Id": usuario.id.toString(), // ✅ importante
+        },
       });
 
       alert("Juego actualizado con éxito");

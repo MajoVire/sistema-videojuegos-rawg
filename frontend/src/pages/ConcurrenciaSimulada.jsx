@@ -167,14 +167,29 @@ const ConcurrenciaSimulada = () => {
     }
   };
 
+  const obtenerUsuarioId = async (index) => {
+    const correo = `usuario_simulado_${index}@test.com`;
+    const res = await axios.get(`/api/usuarios/buscar`, {
+      params: { correo }
+    });
+    return res.data.id;  // Asegúrate que tu backend devuelva { id, nombre, correo }
+  };
+
+
   // Función auxiliar para actualizar rating
-  const actualizarRating = async (juegoId, usuarioId) => {
-    const nuevoRating = (Math.random() * 4 + 1).toFixed(1); // Rating entre 1.0 y 5.0
+  const actualizarRating = async (juegoId, usuarioIndex) => {
+    const nuevoRating = (Math.random() * 4 + 1).toFixed(1);
+    const usuarioId = await obtenerUsuarioId(usuarioIndex); // ✅
+
     return await axios.put(`/api/juegos/${juegoId}/actualizar/concurrente`, {
-      rating: nuevoRating,
-      usuario_simulado: `usuario_simulado_${usuarioId}@test.com`
+      rating: nuevoRating
+    }, {
+      headers: {
+        "X-Usuario-Simulado-Id": usuarioId  // así se manda correctamente al backend
+      }
     });
   };
+
 
   // Cargar logs desde el backend
   const cargarLogs = async () => {
