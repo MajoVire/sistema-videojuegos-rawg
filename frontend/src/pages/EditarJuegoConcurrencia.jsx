@@ -15,7 +15,7 @@ const EditarJuegoConcurrencia = ({ usuario }) => {
 
     let isMounted = true;
 
-    // Cargar usuarios activos
+    // --- Cargar usuarios activos ---
     const cargarActivos = () => {
       axios
         .get(`${apiUrl}/api/usuarios/activos`)
@@ -27,25 +27,44 @@ const EditarJuegoConcurrencia = ({ usuario }) => {
         });
     };
 
-    cargarActivos();
-    const activosInterval = setInterval(cargarActivos, 3000);
-
-    // Cargar juegos
+    // --- Cargar juegos ---
     const cargarJuegos = () => {
       axios.get(`${apiUrl}/api/juegos`)
         .then((res) => {
           if (isMounted) setJuegos(res.data.juegos);
         });
     };
+
+    // --- Enviar ping al backend ---
+    const pingUsuario = () => {
+      if (document.visibilityState !== "visible") return;
+
+      axios.post(`${apiUrl}/api/usuarios/ping`, null, {
+        headers: {
+          "X-Usuario-Simulado-Id": usuario.id.toString(),
+        },
+      }).catch((err) => {
+        console.warn("No se pudo enviar ping:", err);
+      });
+    };
+
+    // Ejecutar al cargar
+    cargarActivos();
     cargarJuegos();
+    pingUsuario();
+
+    // Intervalos cada 5 segundos
+    const activosInterval = setInterval(cargarActivos, 5000);
+    const pingInterval = setInterval(pingUsuario, 5000);
 
     // Limpieza
     return () => {
       isMounted = false;
       clearInterval(activosInterval);
+      clearInterval(pingInterval);
     };
-
   }, [usuario]);
+
 
 
   // Al seleccionar un juego del combo box

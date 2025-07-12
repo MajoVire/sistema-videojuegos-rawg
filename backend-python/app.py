@@ -217,9 +217,6 @@ def usuarios_activos():
     ventana = int(request.args.get("ventana", 15))  # segundos
     limite = datetime.now(timezone.utc) - timedelta(seconds=ventana)
     
-    print("Hora actual UTC:", datetime.now(timezone.utc))
-    print("Hora actual local:", datetime.now())
-
     with get_conn() as conn, conn.cursor() as cur:
         cur.execute("""
             SELECT id, nombre, correo
@@ -241,15 +238,10 @@ def ping_usuario():
         return jsonify({"error": "Falta el ID del usuario simulado"}), 400
 
     with get_conn() as conn, conn.cursor() as cur:
-        cur.execute("""
-            UPDATE usuarios_simulados
-            SET ultima_ping = CURRENT_TIMESTAMP
-            WHERE id = %s
-        """, (usuario_id,))
+        cur.execute("SELECT actualizar_ping(%s)", (usuario_id,))
         conn.commit()
 
     return jsonify({"status": "ok"})
-
 
 @app.route("/api/juegos/<int:juego_id>", methods=["GET"])
 def obtener_juego_por_id(juego_id):
