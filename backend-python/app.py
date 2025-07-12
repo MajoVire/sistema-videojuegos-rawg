@@ -1,5 +1,7 @@
 from flask import Flask, jsonify, request, g
 from flask_cors import CORS
+from flask import current_app
+import logging
 import requests
 import psycopg2
 import os
@@ -172,35 +174,89 @@ def obtener_usuarios_simulados():
     ]
     return jsonify(resultado)
 
-@app.route("/api/juegos/bloquear/<int:juego_id>", methods=["GET"])
+@app.route("/api/juegos/<int:juego_id>/bloquear", methods=["POST"])
 def bloquear_juego(juego_id):
+    usuario_id = request.headers.get("X-Usuario-Simulado-Id")
+
+    if not usuario_id:
+        return jsonify({"error": "Falta header de usuario"}), 400
+
     try:
-        conn = get_conn()
-        conn.autocommit = False  # Activar transacción manual
-        cur = conn.cursor()
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                ahora = datetime.now(timezone.utc)
+                expiracion = ahora + timedelta(minutes=5)  # duración del lock
 
-        # SELECT ... FOR UPDATE bloquea el registro
-        cur.execute("SELECT id FROM juegos WHERE id = %s FOR UPDATE;", (juego_id,))
-        cur.callproc("obtener_juego_por_id", (juego_id,))
-        juego = cur.fetchone()
+                # Intenta bloquear si no está bloqueado o si el lock expiró
+                cur.execute("""
+                    UPDATE juegos
+                    SET bloqueado_por = %s,
+                        bloqueo_expira = %s
+                    WHERE id = %s AND (
+                        bloqueado_por IS NULL OR
+                        bloqueo_expira < %s OR
+                        bloqueado_por = %s
+                    )
+                    RETURNING id;
+                """, (usuario_id, expiracion, juego_id, ahora, usuario_id))
 
-        if not juego:
-            return jsonify({"error": "Juego no encontrado"}), 404
+                if cur.fetchone() is None:
+                    # Bloqueado por otro usuario
+                    cur.execute("""
+                        SELECT bloqueado_por, bloqueo_expira FROM juegos WHERE id = %s;
+                    """, (juego_id,))
+                    row = cur.fetchone()
+                    return jsonify({
+                        "error": "Juego actualmente en edición por otro usuario",
+                        "bloqueado_por": row[0],
+                        "bloqueo_expira": row[1].isoformat()
+                    }), 409
 
-        # Guardar conexión abierta en algún lado, solo para fines de test (no producción)
-        app.locked_conns[juego_id] = conn
+                # Obtener datos del juego bloqueado
+                cur.callproc("obtener_juego_por_id", (juego_id,))
+                juego = cur.fetchone()
 
-        return jsonify({
-            "id": juego[0],
-            "nombre": juego[1],
-            "fecha": juego[2],
-            "rating": juego[3],
-            "mensaje": "Juego bloqueado con SELECT FOR UPDATE"
-        })
+                return jsonify({
+                    "id": juego[0],
+                    "nombre": juego[1],
+                    "fecha": juego[2],
+                    "rating": juego[3],
+                    "bloqueado_por": usuario_id,
+                    "bloqueo_expira": expiracion.isoformat(),
+                    "mensaje": "Juego bloqueado correctamente"
+                })
+
+    except Exception as e:
+        print("Error al bloquear juego:", e)
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/juegos/<int:juego_id>/liberar", methods=["POST"])
+def liberar_juego(juego_id):
+    usuario_id = request.headers.get("X-Usuario-Simulado-Id")
+
+    if not usuario_id:
+        return jsonify({"error": "Falta header de usuario"}), 400
+
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                # Solo el que lo bloqueó puede liberarlo
+                cur.execute("""
+                    UPDATE juegos
+                    SET bloqueado_por = NULL,
+                        bloqueo_expira = NULL
+                    WHERE id = %s AND bloqueado_por = %s;
+                """, (juego_id, usuario_id))
+                print("Intentando liberar el juego", juego_id, "por usuario", usuario_id, "-> bloqueado_por:", cur.fetchone())
+
+                if cur.rowcount == 0:
+                    return jsonify({"error": "No tienes permisos para liberar este juego"}), 403
+
+                return jsonify({"mensaje": "Juego liberado correctamente"})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
+    
 # ---------- heartbeat ----------
 @app.route("/api/usuarios/activos", methods=["GET"])
 def usuarios_activos():

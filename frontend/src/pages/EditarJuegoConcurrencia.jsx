@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import apiUrl from "../apiConfig";
 
@@ -10,12 +10,26 @@ const EditarJuegoConcurrencia = ({ usuario }) => {
   const [fecha, setFecha] = useState("");
   const [rating, setRating] = useState("");
 
+  // 🔓 Liberar juego si se desmonta o cambia selección
+  const liberarJuego = useCallback(async () => {
+    if (!juegoSeleccionadoId) return;
+
+    try {
+      await axios.post(`${apiUrl}/api/juegos/${juegoSeleccionadoId}/liberar`, null, {
+        headers: {
+          "X-Usuario-Simulado-Id": usuario.id.toString(),
+        },
+      });
+    } catch (err) {
+      console.warn("No se pudo liberar el juego:", err);
+    }
+  }, [juegoSeleccionadoId, usuario?.id]);
+
   useEffect(() => {
     if (!usuario || !usuario.id) return;
 
     let isMounted = true;
 
-    // --- Cargar usuarios activos ---
     const cargarActivos = () => {
       axios
         .get(`${apiUrl}/api/usuarios/activos`)
@@ -27,61 +41,81 @@ const EditarJuegoConcurrencia = ({ usuario }) => {
         });
     };
 
-    // --- Cargar juegos ---
     const cargarJuegos = () => {
-      axios.get(`${apiUrl}/api/juegos`)
-        .then((res) => {
-          if (isMounted) setJuegos(res.data.juegos);
-        });
-    };
-
-    // --- Enviar ping al backend ---
-    const pingUsuario = () => {
-      if (document.visibilityState !== "visible") return;
-
-      axios.post(`${apiUrl}/api/usuarios/ping`, null, {
-        headers: {
-          "X-Usuario-Simulado-Id": usuario.id.toString(),
-        },
-      }).catch((err) => {
-        console.warn("No se pudo enviar ping:", err);
+      axios.get(`${apiUrl}/api/juegos`).then((res) => {
+        if (isMounted) setJuegos(res.data.juegos);
       });
     };
 
-    // Ejecutar al cargar
+    const pingUsuario = () => {
+      if (document.visibilityState !== "visible") return;
+
+      axios
+        .post(`${apiUrl}/api/usuarios/ping`, null, {
+          headers: {
+            "X-Usuario-Simulado-Id": usuario.id.toString(),
+          },
+        })
+        .catch((err) => {
+          console.warn("No se pudo enviar ping:", err);
+        });
+    };
+
     cargarActivos();
     cargarJuegos();
     pingUsuario();
 
-    // Intervalos cada 5 segundos
     const activosInterval = setInterval(cargarActivos, 5000);
     const pingInterval = setInterval(pingUsuario, 5000);
 
-    // Limpieza
     return () => {
+      liberarJuego();
       isMounted = false;
       clearInterval(activosInterval);
       clearInterval(pingInterval);
     };
-  }, [usuario]);
+  }, [usuario, liberarJuego]);
 
-
-
-  // Al seleccionar un juego del combo box
   const handleSeleccionJuego = async (e) => {
     const id = e.target.value;
+
+    if (juegoSeleccionadoId && juegoSeleccionadoId !== id) {
+      await liberarJuego();
+    }
+
     setJuegoSeleccionadoId(id);
 
     if (id) {
       try {
-        const res = await axios.get(`${apiUrl}/api/juegos/${id}`);
-        const juego = res.data;
-        setNombre(juego.nombre);
-        setFecha(juego.fecha_lanzamiento);
-        setRating(juego.rating);
+        const bloqueoRes = await axios.post(`${apiUrl}/api/juegos/${id}/bloquear`, null, {
+          headers: {
+            "X-Usuario-Simulado-Id": usuario.id.toString(),
+          },
+        });
+
+        const juegoBloqueado = bloqueoRes.data;
+
+        setNombre(juegoBloqueado.nombre);
+        setFecha(juegoBloqueado.fecha);
+        setRating(juegoBloqueado.rating);
       } catch (err) {
-        console.error("Error al obtener datos del juego:", err);
-        alert("Error al obtener los datos del juego.");
+        console.error("Error al bloquear el juego:", err);
+
+        if (err.response?.status === 409) {
+          const data = err.response.data;
+          alert(
+            `⚠️ El juego ya está siendo editado por el usuario ID: ${data.bloqueado_por}\nBloqueo expira a las ${new Date(
+              data.bloqueo_expira
+            ).toLocaleTimeString()}`
+          );
+        } else {
+          alert("Ocurrió un error inesperado al intentar bloquear el juego.");
+        }
+
+        setJuegoSeleccionadoId("");
+        setNombre("");
+        setFecha("");
+        setRating("");
       }
     }
   };
@@ -90,17 +124,28 @@ const EditarJuegoConcurrencia = ({ usuario }) => {
     e.preventDefault();
 
     try {
-      await axios.put(`${apiUrl}/api/juegos/${juegoSeleccionadoId}`, {
-        nombre,
-        fecha_lanzamiento: fecha,
-        rating: parseFloat(rating),
-      }, {
-        headers: {
-          "X-Usuario-Simulado-Id": usuario.id.toString(), // ✅ importante
+      await axios.put(
+        `${apiUrl}/api/juegos/${juegoSeleccionadoId}`,
+        {
+          nombre,
+          fecha_lanzamiento: fecha,
+          rating: parseFloat(rating),
         },
-      });
+        {
+          headers: {
+            "X-Usuario-Simulado-Id": usuario.id.toString(),
+          },
+        }
+      );
 
       alert("Juego actualizado con éxito");
+
+      await liberarJuego();
+
+      setJuegoSeleccionadoId("");
+      setNombre("");
+      setFecha("");
+      setRating("");
     } catch (error) {
       console.error("Error actualizando juego:", error);
       alert("Error al actualizar el juego.");
@@ -114,7 +159,9 @@ const EditarJuegoConcurrencia = ({ usuario }) => {
   return (
     <div className="p-6 space-y-6">
       <h2 className="text-xl font-bold mb-2">Usuario actual</h2>
-      <p className="text-green-800 font-semibold">👤 {usuario.nombre} ({usuario.correo})</p>
+      <p className="text-green-800 font-semibold">
+        👤 {usuario.nombre} ({usuario.correo})
+      </p>
 
       <h2 className="text-xl font-bold mt-6 mb-2">Usuarios en línea</h2>
       <ul className="space-y-2">
@@ -128,7 +175,9 @@ const EditarJuegoConcurrencia = ({ usuario }) => {
       <h2 className="text-xl font-bold mt-6 mb-2">Editar juego</h2>
 
       <div>
-        <label className="block text-sm font-medium mb-1">Selecciona un juego</label>
+        <label className="block text-sm font-medium mb-1">
+          Selecciona un juego
+        </label>
         <select
           onChange={handleSeleccionJuego}
           value={juegoSeleccionadoId}
