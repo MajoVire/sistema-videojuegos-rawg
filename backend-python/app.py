@@ -134,14 +134,13 @@ def filtrar_juegos():
 
         with get_conn() as conn:
             with conn.cursor() as cur:
-                query = """SELECT * FROM filtrar_juegos_func_optimizado(%s, %s, %s, %s);"""
+                query = """SELECT * FROM filtrar_juegos_func(%s, %s, %s, %s);"""
                 cur.execute(query, (genero, plataforma, limit, offset))
                 juegos = cur.fetchall()
                 
                  # Obtener EXPLAIN ANALYZE para el conteo
-                cur.execute("EXPLAIN ANALYZE SELECT filtrar_juegos_func_optimizado(%s, %s);", (genero, plataforma))
+                cur.execute("EXPLAIN ANALYZE SELECT * FROM filtrar_juegos_func(%s, %s, %s, %s);", (genero, plataforma, limit, offset))
                 plan = [row[0] for row in cur.fetchall()]
-
 
                 count_query = "SELECT contar_juegos_func_optimizado(%s, %s);"
                 cur.execute(count_query, (genero, plataforma))
